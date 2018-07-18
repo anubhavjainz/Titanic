@@ -83,7 +83,7 @@ Train<-Train[index,]
 Test<-Full[Full$Set=="TTest",]
 
 #################### Applying Decision Tree Model for initial understanding of Parameters
-mod<-rpart(Survived~Sex_Male+Sex_Female+Pclass_1+Pclass_2+Pclass_3+Age+Parch,data=Train,control=rpart.control(cp=0.002,maxdepth=7),method="class",parms=list(split="gini"))
+mod<-rpart(Survived~Sex_Male+Sex_Female+Pclass_1+Pclass_2+Pclass_3+Age+Parch+SibSp,data=Train,control=rpart.control(cp=0.002,maxdepth=7),method="class",parms=list(split="gini"))
 
 mod
 #Visualization of Model
@@ -167,7 +167,7 @@ unlist(auc@y.values)
 ######## Logistic regression
 
 
-mod1<-glm(formula = Survived~Sex_Male+Sex_Female+Pclass_1+Pclass_2+Pclass_3+Age+Parch, family = "binomial", data = Train)
+mod1<-glm(formula = Survived~Sex_Male+Sex_Female+Pclass_1+Pclass_2+Pclass_3+Age+Parch+SibSp, family = "binomial", data = Train)
 mod1
 summary(mod1)
 #### Model Accuracy on the Train Data Itself
@@ -244,7 +244,7 @@ unlist(auc@y.values)
 
 ########################################### Using Random Forest Algorithm
 
-model1 <- randomForest(formula = Survived~Sex_Male+Sex_Female+Pclass_1+Pclass_2+Pclass_3+Age+Parch,ntree = 500, data = Train, importance = TRUE)
+model1 <- randomForest(formula = Survived~Sex_Male+Sex_Female+Pclass_1+Pclass_2+Pclass_3+Age+Parch+SibSp,ntree = 500, data = Train, importance = TRUE)
 model1
 a=c()
 i=5
