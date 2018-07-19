@@ -72,6 +72,13 @@ Full$Pclass_3<-ifelse(Full$Pclass==3,1,0)
 
 Full$Survived<-as.factor(Full$Survived)
 
+Full[is.na(Full$Fare),]$Fare<-6.237
+
+T_C<-Full%>%group_by(Ticket)%>%summarise(Ticket_count=n())
+
+Full<-full_join(x=Full,y=T_C,by="Ticket")
+
+plot(Full$Survived~Full$Ticket_count)
 
 #################### Spliting Train, Validation and Test DataSet
 set.seed(100)
@@ -83,7 +90,7 @@ Train<-Train[index,]
 Test<-Full[Full$Set=="TTest",]
 
 #################### Applying Decision Tree Model for initial understanding of Parameters
-mod<-rpart(Survived~Sex_Male+Sex_Female+Pclass_1+Pclass_2+Pclass_3+Age+Parch+SibSp,data=Train,control=rpart.control(cp=0.002,maxdepth=7),method="class",parms=list(split="gini"))
+mod<-rpart(Survived~Sex_Male+Sex_Female+Pclass_1+Pclass_2+Pclass_3+Age+Parch+SibSp+Ticket_count,data=Train,control=rpart.control(cp=0.002,maxdepth=7),method="class",parms=list(split="gini"))
 
 mod
 #Visualization of Model
@@ -93,8 +100,8 @@ printcp(mod)
 plotcp(mod, minline = TRUE)
 
 ### Model Pruning
-mod1<-prune(mod,cp= 0.02)
-
+mod1<-prune(mod,cp= 0.024)
+fancyRpartPlot(mod1)
 #### Model Accuracy on the Train Data Itself
 actual<-Train$Survived
 predicted<-predict(mod1,type = "class")
@@ -167,7 +174,7 @@ unlist(auc@y.values)
 ######## Logistic regression
 
 
-mod1<-glm(formula = Survived~Sex_Male+Sex_Female+Pclass_1+Pclass_2+Pclass_3+Age+Parch+SibSp, family = "binomial", data = Train)
+mod1<-glm(formula = Survived~Sex_Male+Sex_Female+Pclass_1+Pclass_2+Pclass_3+Age+SibSp+Ticket_count, family = "binomial", data = Train)
 mod1
 summary(mod1)
 #### Model Accuracy on the Train Data Itself
@@ -244,12 +251,12 @@ unlist(auc@y.values)
 
 ########################################### Using Random Forest Algorithm
 
-model1 <- randomForest(formula = Survived~Sex_Male+Sex_Female+Pclass_1+Pclass_2+Pclass_3+Age+Parch+SibSp,ntree = 500, data = Train, importance = TRUE)
+model1 <- randomForest(formula = Survived~Sex_Male+Sex_Female+Pclass_1+Pclass_2+Pclass_3+Age+SibSp+Ticket_count,ntree = 500, data = Train, importance = TRUE)
 model1
 a=c()
 i=5
 for (i in 3:6) {
-  model3 <- randomForest(formula = Survived~Sex_Male+Sex_Female+Pclass_1+Pclass_2+Pclass_3+Age,ntree = 500,mtry=i, data = Train, importance = TRUE)
+  model3 <- randomForest(formula = Survived~Sex_Male+Sex_Female+Pclass_1+Pclass_2+Pclass_3+Age+SibSp+Ticket_count,ntree = 500,mtry=i, data = Train, importance = TRUE)
   predValid <- predict(model3, Validate, type = "class")
   a[i-2] = mean(predValid == Validate$Survived)
 }
@@ -260,7 +267,7 @@ plot(3:6,a)
 
 
 ######max accuracy at mtry=3
-model1 <- randomForest(formula = Survived~Sex_Male+Sex_Female+Pclass_1+Pclass_2+Pclass_3+Age+Parch,ntree = 500,mtry=3, data = Train, importance = TRUE)
+model1 <- randomForest(formula = Survived~Sex_Male+Sex_Female+Pclass_1+Pclass_2+Pclass_3+Age+SibSp+Ticket_count,ntree = 500,mtry=3, data = Train, importance = TRUE)
 model1
 
 
