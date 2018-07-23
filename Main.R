@@ -1,7 +1,7 @@
 ############ Importing the required libraries
 library(dplyr)
 library(ggplot2) #for the exploratory data analysis
-
+library(stringr)
 library(ROCR) # ROCR model validation
 #Decision Tree Libraries
 library(irr)
@@ -46,6 +46,25 @@ ggplot(data=TTrain,mapping=aes(x=Age,fill=Survived,alpha=0.2))+geom_density()+sc
 quantile(Full$Age,na.rm = T)
 median(Full$Age,na.rm = T)
 
+Full$Title<-sub(str_extract(Full$Name, ",.*\\."),pattern = ", ",replacement = "")
+table(Full$Title)
+Full[which(Full$Title=="Mrs. Martin (Elizabeth L."),]$Title<-"Mrs."
+table(Full$Title,Full$Sex)
+Missing<-Full%>%filter(is.na(Age))
+table(Missing$Title,Missing$Sex)
+
+NotMissing<-Full%>%filter(!is.na(Age))
+
+NotMissing%>%group_by(Title,Sex)%>%summarise(mean(Age))
+
+ggplot(data=Full,mapping=aes(y=Age,x=as.factor(Title)))+geom_boxplot()+facet_grid(Sex~Pclass)+theme(axis.text.x = element_text(angle = 90, hjust = 1))
+
+
+Full%>%filter(is.na(Age))%>%group_by(Title,Sex,Pclass)%>%summarise(n())
+Full%>%filter(!is.na(Age))%>%group_by(Title,Sex,Pclass)%>%summarise(median(Age))
+
+
+
 
 plot(as.factor(TTrain$Sex),as.factor(TTrain$Survived))
 
@@ -61,7 +80,21 @@ ggplot(data=Full,mapping=aes(x=Fare))+geom_density()+scale_x_continuous(limit=c(
 ############### Data Preparation
 
 ###### replacing Age with the median value
-Full[is.na(Full$Age),]$Age<-28
+#Male doctor 42.7
+#master 5.48
+#miss 21.8
+#Mr 32.3
+#Mrs 37.0
+#Ms 28
+
+
+Full[is.na(Full$Age)&Full$Sex=='male'&Full$Title=='Dr.',]$Age<-42.7
+Full[is.na(Full$Age)&Full$Title=='Master.',]$Age<-5.48
+Full[is.na(Full$Age)&Full$Title=='Miss.',]$Age<-21.8
+Full[is.na(Full$Age)&Full$Title=='Mr.',]$Age<-32.3
+Full[is.na(Full$Age)&Full$Title=='Mrs.',]$Age<-37.0
+Full[is.na(Full$Age)&Full$Title=='Ms.',]$Age<-28
+
 
 Full$Sex_Male<-ifelse(Full$Sex=="male",1,0)
 Full$Sex_Female<-ifelse(Full$Sex=="female",1,0)
@@ -72,6 +105,17 @@ Full$Pclass_3<-ifelse(Full$Pclass==3,1,0)
 
 Full$Survived<-as.factor(Full$Survived)
 
+Full[is.na(Full$Fare),]$Fare<-6.237
+
+T_C<-Full%>%group_by(Ticket)%>%summarise(Ticket_count=n())
+
+Full<-full_join(x=Full,y=T_C,by="Ticket")
+
+plot(Full$Survived~Full$Ticket_count)
+Full$Ticket_count_1<-ifelse(Full$Ticket_count<4.5,1,0)
+plot(Full$Survived~(Full$Parch+Full$SibSp))
+
+Full$Family<-Full$Parch+Full$SibSp
 
 #################### Spliting Train, Validation and Test DataSet
 set.seed(100)
@@ -83,7 +127,7 @@ Train<-Train[index,]
 Test<-Full[Full$Set=="TTest",]
 
 #################### Applying Decision Tree Model for initial understanding of Parameters
-mod<-rpart(Survived~Sex_Male+Sex_Female+Pclass_1+Pclass_2+Pclass_3+Age+Parch+SibSp,data=Train,control=rpart.control(cp=0.002,maxdepth=7),method="class",parms=list(split="gini"))
+mod<-rpart(Survived~Sex_Male+Sex_Female+Pclass_1+Pclass_2+Pclass_3+Age+Family,data=Train,control=rpart.control(cp=0.002,maxdepth=7),method="class",parms=list(split="gini"))
 
 mod
 #Visualization of Model
@@ -93,8 +137,8 @@ printcp(mod)
 plotcp(mod, minline = TRUE)
 
 ### Model Pruning
-mod1<-prune(mod,cp= 0.02)
-
+mod1<-prune(mod,cp= 0.022)
+fancyRpartPlot(mod1)
 #### Model Accuracy on the Train Data Itself
 actual<-Train$Survived
 predicted<-predict(mod1,type = "class")
@@ -167,7 +211,7 @@ unlist(auc@y.values)
 ######## Logistic regression
 
 
-mod1<-glm(formula = Survived~Sex_Male+Sex_Female+Pclass_1+Pclass_2+Pclass_3+Age+Parch+SibSp, family = "binomial", data = Train)
+mod1<-glm(formula = Survived~Sex_Male+Pclass_1+Pclass_2+Age+Family, family = "binomial", data = Train)
 mod1
 summary(mod1)
 #### Model Accuracy on the Train Data Itself
@@ -244,12 +288,12 @@ unlist(auc@y.values)
 
 ########################################### Using Random Forest Algorithm
 
-model1 <- randomForest(formula = Survived~Sex_Male+Sex_Female+Pclass_1+Pclass_2+Pclass_3+Age+Parch+SibSp,ntree = 500, data = Train, importance = TRUE)
+model1 <- randomForest(formula = Survived~Sex_Male+Sex_Female+Pclass_1+Pclass_2+Pclass_3+Age+SibSp+Ticket_count_1,ntree = 500, data = Train, importance = TRUE)
 model1
 a=c()
 i=5
 for (i in 3:6) {
-  model3 <- randomForest(formula = Survived~Sex_Male+Sex_Female+Pclass_1+Pclass_2+Pclass_3+Age,ntree = 500,mtry=i, data = Train, importance = TRUE)
+  model3 <- randomForest(formula = Survived~Sex_Male+Sex_Female+Pclass_1+Pclass_2+Pclass_3+Age+SibSp+Ticket_count,ntree = 500,mtry=i, data = Train, importance = TRUE)
   predValid <- predict(model3, Validate, type = "class")
   a[i-2] = mean(predValid == Validate$Survived)
 }
@@ -260,7 +304,7 @@ plot(3:6,a)
 
 
 ######max accuracy at mtry=3
-model1 <- randomForest(formula = Survived~Sex_Male+Sex_Female+Pclass_1+Pclass_2+Pclass_3+Age+Parch,ntree = 500,mtry=3, data = Train, importance = TRUE)
+model1 <- randomForest(formula = Survived~Sex_Male+Sex_Female+Pclass_1+Pclass_2+Pclass_3+Age+SibSp+Ticket_count,ntree = 500,mtry=3, data = Train, importance = TRUE)
 model1
 
 
